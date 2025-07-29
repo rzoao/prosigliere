@@ -1,10 +1,12 @@
 from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, Session, relationship
 from sqlalchemy.ext.declarative import declarative_base
+from pydantic import BaseModel
+from typing import List
 import uvicorn
 
 
@@ -13,20 +15,6 @@ DATABASE_URL = "sqlite:///./blog.db"  # Using SQLite for simplicity
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-
-app = FastAPI(
-    title="Blog API",
-    description="RESTful API for managing blog posts and comments",
-    version="1.0.0"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 class BlogPost(Base):
@@ -45,16 +33,70 @@ class Comment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False)
-    author = Column(String(100), nullable=False)  # Simple author field
+    author = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     blog_post_id = Column(Integer, ForeignKey("blog_posts.id"), nullable=False)
     blog_post = relationship("BlogPost", back_populates="comments")
 
 
+class BlogPostSummary(BaseModel):
+    id: int
+    title: str
+    comment_count: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+app = FastAPI(
+    title="Blog API",
+    description="RESTful API for managing blog posts and comments",
+    version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # TODO: Restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 Base.metadata.create_all(bind=engine)
 
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# API Endpoints
+@app.get("/api/posts", response_model=List[BlogPostSummary])
+async def get_all_posts(db: Session = Depends(get_db)):
+    """
+    Retrieve all blog posts with their comment counts.
+    """
+    # TODO: add pagination
+    posts = db.query(BlogPost).all()
+    
+    result = []
+    for post in posts:
+        result.append(BlogPostSummary(
+            id=post.id,
+            title=post.title,
+            comment_count=len(post.comments),
+            created_at=post.created_at
+        ))
+    
+    return result
+
+
 if __name__ == "__main__":
-    # TODO: Use proper ASGI server like Gunicorn in production
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
