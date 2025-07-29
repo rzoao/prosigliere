@@ -1,8 +1,10 @@
+from datetime import datetime
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 import uvicorn
 
 
@@ -25,6 +27,29 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+class BlogPost(Base):
+    __tablename__ = "blog_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    comments = relationship("Comment", back_populates="blog_post", cascade="all, delete-orphan")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(Text, nullable=False)
+    author = Column(String(100), nullable=False)  # Simple author field
+    created_at = Column(DateTime, default=datetime.utcnow)
+    blog_post_id = Column(Integer, ForeignKey("blog_posts.id"), nullable=False)
+    blog_post = relationship("BlogPost", back_populates="comments")
+
 
 if __name__ == "__main__":
     # TODO: Use proper ASGI server like Gunicorn in production
