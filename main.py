@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from sqlalchemy.ext.declarative import declarative_base
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 import uvicorn
 
@@ -39,6 +39,19 @@ class Comment(Base):
     blog_post = relationship("BlogPost", back_populates="comments")
 
 
+class CommentBase(BaseModel):
+    content: str = Field(min_length=1, max_length=1000)
+    author: str = Field(min_length=1, max_length=100)
+
+
+class CommentResponse(CommentBase):
+    id: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
 class BlogPostSummary(BaseModel):
     id: int
     title: str
@@ -47,6 +60,25 @@ class BlogPostSummary(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class BlogPostBase(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1)
+
+
+class BlogPostResponse(BlogPostBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    comments: List[CommentResponse] = []
+    
+    class Config:
+        from_attributes = True
+
+
+class BlogPostCreate(BlogPostBase):
+    pass
 
 
 app = FastAPI(
@@ -78,9 +110,6 @@ def get_db():
 # API Endpoints
 @app.get("/api/posts", response_model=List[BlogPostSummary])
 async def get_all_posts(db: Session = Depends(get_db)):
-    """
-    Retrieve all blog posts with their comment counts.
-    """
     # TODO: add pagination
     posts = db.query(BlogPost).all()
     
@@ -94,6 +123,20 @@ async def get_all_posts(db: Session = Depends(get_db)):
         ))
     
     return result
+
+
+@app.post("/api/posts", response_model=BlogPostResponse, status_code=status.HTTP_201_CREATED)
+async def create_post(post_data: BlogPostCreate, db: Session = Depends(get_db)):
+    db_post = BlogPost(
+        title=post_data.title,
+        content=post_data.content
+    )
+    
+    db.add(db_post)
+    db.commit()
+    db.refresh(db_post)
+    
+    return db_post
 
 
 if __name__ == "__main__":

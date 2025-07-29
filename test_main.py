@@ -30,6 +30,7 @@ def test_db():
     yield
     Base.metadata.drop_all(bind=engine)
 
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -39,3 +40,37 @@ def test_get_empty_posts(client, test_db):
     response = client.get("/api/posts")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_get_posts_with_data(client, test_db):
+    """Test getting posts when data exists."""
+    # Create a post first
+    post_data = {"title": "Test Post", "content": "Test content"}
+    client.post("/api/posts", json=post_data)
+    
+    response = client.get("/api/posts")
+    assert response.status_code == 200
+    
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Test Post"
+    assert data[0]["comment_count"] == 0
+    assert "created_at" in data[0]
+
+
+def test_create_post(client, test_db):
+    post_data = {
+        "title": "Test Post",
+        "content": "This is a test post content."
+    }
+    
+    response = client.post("/api/posts", json=post_data)
+    assert response.status_code == 201
+    
+    data = response.json()
+    assert data["title"] == post_data["title"]
+    assert data["content"] == post_data["content"]
+    assert data["id"] == 1
+    assert "created_at" in data
+    assert "updated_at" in data
+    assert data["comments"] == []
