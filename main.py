@@ -51,6 +51,8 @@ class Comment(Base):
     blog_post = relationship("BlogPost", back_populates="comments")
 
 
+Base.metadata.create_all(bind=engine)
+
 if __name__ == "__main__":
     # TODO: Use proper ASGI server like Gunicorn in production
     uvicorn.run(
