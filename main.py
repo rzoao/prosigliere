@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import FastAPI, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import sessionmaker, Session, relationship
@@ -123,6 +123,19 @@ async def get_all_posts(db: Session = Depends(get_db)):
         ))
     
     return result
+
+
+@app.get("/api/posts/{post_id}", response_model=BlogPostResponse)
+async def get_post(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+    
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Blog post with id {post_id} not found"
+        )
+    
+    return post
 
 
 @app.post("/api/posts", response_model=BlogPostResponse, status_code=status.HTTP_201_CREATED)

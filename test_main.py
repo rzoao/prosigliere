@@ -74,3 +74,18 @@ def test_create_post(client, test_db):
     assert "created_at" in data
     assert "updated_at" in data
     assert data["comments"] == []
+
+
+def test_get_post_by_id(client, test_db):
+    post_data = {"title": "Specific Post", "content": "Specific content"}
+    create_response = client.post("/api/posts", json=post_data)
+    post_id = create_response.json()["id"]
+    
+    response = client.get(f"/api/posts/{post_id}")
+    assert response.status_code == 200
+    
+    data = response.json()
+    assert data["title"] == "Specific Post"
+    assert data["content"] == "Specific content"
+    assert data["comments"] == []
+
