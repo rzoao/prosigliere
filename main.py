@@ -44,6 +44,10 @@ class CommentBase(BaseModel):
     author: str = Field(min_length=1, max_length=100)
 
 
+class CommentCreate(CommentBase):
+    pass
+
+
 class CommentResponse(CommentBase):
     id: int
     created_at: datetime
@@ -150,6 +154,36 @@ async def create_post(post_data: BlogPostCreate, db: Session = Depends(get_db)):
     db.refresh(db_post)
     
     return db_post
+
+
+@app.post(
+    "/api/posts/{post_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED
+)
+async def create_comment(
+    post_id: int, 
+    comment_data: CommentCreate, 
+    db: Session = Depends(get_db)
+):
+    post = db.query(BlogPost).filter(BlogPost.id == post_id).first()
+    if not post:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Blog post with id {post_id} not found"
+        )
+    
+    db_comment = Comment(
+        content=comment_data.content,
+        author=comment_data.author,
+        blog_post_id=post_id
+    )
+    
+    db.add(db_comment)
+    db.commit()
+    db.refresh(db_comment)
+    
+    return db_comment
 
 
 if __name__ == "__main__":
